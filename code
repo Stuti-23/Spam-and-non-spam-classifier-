@@ -1,0 +1,428 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import pandas as pd 
+import numpy as np
+import matplotlib.pyplot as plt 
+
+
+# In[2]:
+
+
+df=pd.read_csv(r"C:\Users\DELL\Downloads\spam.csv")
+df.head()
+
+
+# In[3]:
+
+
+df.shape
+
+
+# In[4]:
+
+
+df.describe()
+
+
+# In[5]:
+
+
+df.info()
+
+
+# In[6]:
+
+
+df.isnull().sum()
+
+
+# In[7]:
+
+
+df.head()
+
+
+# In[8]:
+
+
+df.isnull().sum()
+
+
+# In[9]:
+
+
+df.drop(columns=['Unnamed: 2','Unnamed: 3','Unnamed: 4'],axis=1,inplace=True)
+
+
+# In[10]:
+
+
+from sklearn.preprocessing import LabelEncoder
+encoder=LabelEncoder()
+
+
+# In[11]:
+
+
+df['v1']=encoder.fit_transform(df['v1'])
+
+
+# In[12]:
+
+
+df.head()
+
+
+# In[13]:
+
+
+df.duplicated().sum()
+
+
+# In[14]:
+
+
+df=df.drop_duplicates(keep="first")
+
+
+# In[15]:
+
+
+df.duplicated().sum()
+
+
+# In[16]:
+
+
+plt.pie(df['v1'].value_counts(),labels=['ham','spam'],autopct="%0.2f")
+plt.show()
+
+
+# In[17]:
+
+
+df.rename(columns={'v1':'target','v2':'text'},inplace=True)
+df.head()
+
+
+# In[18]:
+
+
+import nltk 
+
+
+# In[19]:
+
+
+nltk.download('punkt')
+
+
+# In[20]:
+
+
+df['character']=df['text'].apply(len)
+
+
+# In[21]:
+
+
+df['word']=df['text'].apply(lambda x:len(nltk.word_tokenize(x)))
+
+
+# In[22]:
+
+
+df['sentence']=df['text'].apply(lambda x:len(nltk.sent_tokenize(x)))
+
+
+# In[23]:
+
+
+df.head()
+
+
+# In[24]:
+
+
+df[['character','word','sentence']].describe()
+
+
+# In[25]:
+
+
+df[df['target']==0][['character','word','sentence']].describe()
+
+
+# In[26]:
+
+
+df[df['target']==1][['character','word','sentence']].describe()
+
+
+# In[27]:
+
+
+import seaborn as sns 
+
+
+# In[28]:
+
+
+sns.histplot(df[df['target']==0]['word'])
+sns.histplot(df[df['target']==1]['word'],color='red')
+
+
+# In[29]:
+
+
+sns.histplot(df[df['target']==0]['character'])
+sns.histplot(df[df['target']==1]['character'],color='red')
+
+
+# In[30]:
+
+
+sns.pairplot(df,hue='target')
+
+
+# In[31]:
+
+
+df.corr()
+
+
+# In[32]:
+
+
+sns.heatmap(df.corr(),annot=True)
+
+
+# In[33]:
+
+
+import nltk
+nltk.download('stopwords')
+
+
+# In[34]:
+
+
+from nltk.corpus import stopwords
+
+
+# In[35]:
+
+
+import string 
+string.punctuation 
+
+
+# In[36]:
+
+
+from nltk.stem.porter import PorterStemmer
+ps=PorterStemmer()
+
+
+# # Data preprocessing 
+# 
+
+# In[37]:
+
+
+def transform_text(text):
+    text=text.lower()
+    text=nltk.word_tokenize(text)
+    
+    y=[]
+    for i in text:
+        if i.isalnum():
+            y.append(i)
+            
+    text=y[:]
+    y.clear()
+    
+    for i in text:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
+    
+    text=y[:]
+    y.clear()
+    
+    for i in text:
+        y.append(ps.stem(i))
+    
+            
+    return " ".join(y)
+    
+
+
+# In[38]:
+
+
+transform_text("I LOVED you so much ")
+
+
+# In[39]:
+
+
+
+ps.stem("dancing")
+
+
+# In[40]:
+
+
+df["tranformed_text"]=df["text"].apply(transform_text)
+
+
+# In[41]:
+
+
+df.head()
+
+
+# In[42]:
+
+
+pip install wordcloud
+
+
+# In[43]:
+
+
+from wordcloud import WordCloud
+wc=WordCloud(width=500,height=500,min_font_size=10,background_color='white')
+
+
+# In[44]:
+
+
+spam_wc=wc.generate(df[df['target']==1]['tranformed_text'].str.cat(sep=" "))
+
+
+# In[45]:
+
+
+plt.imshow(spam_wc)
+
+
+# In[46]:
+
+
+ham_wc=wc.generate(df[df['target']==0]['tranformed_text'].str.cat(sep=" "))
+
+
+# In[47]:
+
+
+plt.imshow(ham_wc)
+
+
+# # MODEL BUILDING 
+
+# In[48]:
+
+
+df.head()
+
+
+# In[49]:
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer(max_features=3000)
+
+
+# In[50]:
+
+
+X=tfidf.fit_transform(df['tranformed_text']).toarray()
+
+
+# In[51]:
+
+
+X.shape
+
+
+# In[52]:
+
+
+y=df['target'].values
+
+
+# In[53]:
+
+
+y
+
+
+# In[54]:
+
+
+from sklearn.model_selection import train_test_split
+
+
+# In[55]:
+
+
+X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.2,random_state=2)
+
+
+# In[56]:
+
+
+from sklearn.naive_bayes import GaussianNB,MultinomialNB,BernoulliNB
+from sklearn.metrics import accuracy_score,confusion_matrix,precision_score
+
+
+# In[57]:
+
+
+gnb = GaussianNB()
+mnb = MultinomialNB()
+bnb = BernoulliNB()
+
+
+# In[58]:
+
+
+gnb.fit(X_train,y_train)
+y_pred1 = gnb.predict(X_test)
+print(accuracy_score(y_test,y_pred1))
+print(confusion_matrix(y_test,y_pred1))
+print(precision_score(y_test,y_pred1))
+
+
+# In[59]:
+
+
+mnb.fit(X_train,y_train)
+y_pred2 = mnb.predict(X_test)
+print(accuracy_score(y_test,y_pred2))
+print(confusion_matrix(y_test,y_pred2))
+print(precision_score(y_test,y_pred2))
+
+
+# In[60]:
+
+
+bnb.fit(X_train,y_train)
+y_pred3 = bnb.predict(X_test)
+print(accuracy_score(y_test,y_pred3))
+print(confusion_matrix(y_test,y_pred3))
+print(precision_score(y_test,y_pred3))
+
+
+# In[61]:
+
+
+import pickle
+pickle.dump(tfidf,open('vectorizer.pkl','wb'))
+pickle.dump(mnb,open('model.pkl','wb'))
+
